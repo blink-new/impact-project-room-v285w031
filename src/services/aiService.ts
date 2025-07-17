@@ -149,30 +149,55 @@ const extractTextFromFile = async (file: File): Promise<string> => {
         
         let extractedText: string
         let retryCount = 0
-        const maxRetries = 2
+        const maxRetries = 1 // Reduced retries to avoid delays
         
         while (retryCount <= maxRetries) {
           try {
             extractedText = await blink.data.extractFromBlob(cleanFile)
+            
+            // Validate the extracted text quality
+            if (extractedText && typeof extractedText === 'string') {
+              // Check if the text looks like corrupted binary/XML data
+              const xmlTagCount = (extractedText.match(/<[^>]*>/g) || []).length
+              const totalLength = extractedText.length
+              const xmlRatio = xmlTagCount / (totalLength / 100) // XML tags per 100 chars
+              
+              // If more than 10% of content is XML tags, it's likely corrupted
+              if (xmlRatio > 10 && totalLength > 1000) {
+                console.warn(`Extracted text appears to be corrupted XML/binary data for ${file.name}`)
+                throw new Error('Extracted text appears corrupted')
+              }
+              
+              // Check for excessive random characters
+              const randomCharCount = (extractedText.match(/[^\w\s.,:;!?()$%-]/g) || []).length
+              const randomRatio = randomCharCount / totalLength
+              
+              if (randomRatio > 0.3 && totalLength > 1000) {
+                console.warn(`Extracted text contains too many random characters for ${file.name}`)
+                throw new Error('Extracted text quality too low')
+              }
+            }
+            
             break // Success, exit retry loop
           } catch (blinkError: any) {
             retryCount++
             console.warn(`Blink extraction attempt ${retryCount} failed for ${file.name}:`, blinkError)
             
-            // Check for specific Blink validation errors
-            if (blinkError?.message?.includes('File is required') || 
-                blinkError?.code === 'VALIDATION_ERROR' ||
-                blinkError?.status === 400) {
-              
-              if (retryCount <= maxRetries) {
-                console.log(`Retrying Blink extraction for ${file.name} (attempt ${retryCount + 1}/${maxRetries + 1})...`)
-                await new Promise(resolve => setTimeout(resolve, 1000 * retryCount)) // Exponential backoff
-                continue
-              } else {
-                throw new Error(`File validation failed after ${maxRetries + 1} attempts. The file may be corrupted, in an unsupported format, or the service may be temporarily unavailable.`)
-              }
+            // For most errors, don't retry - go straight to fallback
+            if (retryCount > maxRetries) {
+              throw blinkError
+            }
+            
+            // Only retry for specific transient errors
+            if (blinkError?.message?.includes('temporarily unavailable') || 
+                blinkError?.message?.includes('timeout') ||
+                blinkError?.status === 503 ||
+                blinkError?.status === 502) {
+              console.log(`Retrying Blink extraction for ${file.name} (attempt ${retryCount + 1}/${maxRetries + 1})...`)
+              await new Promise(resolve => setTimeout(resolve, 2000)) // Wait 2 seconds
+              continue
             } else {
-              // For other errors, don't retry
+              // For validation errors and other issues, go straight to fallback
               throw blinkError
             }
           }
@@ -195,66 +220,85 @@ const extractTextFromFile = async (file: File): Promise<string> => {
       } catch (error) {
         console.error(`Blink data extraction failed for ${file.name}:`, error)
         
-        // Enhanced fallback to basic binary text extraction
+        // Enhanced fallback to basic binary text extraction with better filtering
         try {
           console.log(`Attempting fallback extraction for ${file.name}...`)
           const arrayBuffer = await file.arrayBuffer()
           const uint8Array = new Uint8Array(arrayBuffer)
           
-          // Look for readable text patterns in the binary data with improved algorithm
-          let extractedText = ''
-          let currentWord = ''
-          let wordCount = 0
-          const maxScanSize = Math.min(uint8Array.length, 200000) // Increased scan size
-          
-          for (let i = 0; i < maxScanSize; i++) {
+          // Convert to string and look for meaningful text patterns
+          let rawText = ''
+          for (let i = 0; i < Math.min(uint8Array.length, 500000); i++) {
             const byte = uint8Array[i]
-            
-            // Check if byte represents a printable ASCII character
             if (byte >= 32 && byte <= 126) {
-              currentWord += String.fromCharCode(byte)
+              rawText += String.fromCharCode(byte)
+            } else if (byte === 10 || byte === 13) {
+              rawText += ' '
             } else {
-              if (currentWord.length > 3 && /^[a-zA-Z0-9]/.test(currentWord)) {
-                extractedText += currentWord + ' '
-                wordCount++
-                
-                // Add occasional line breaks for readability
-                if (wordCount % 20 === 0) {
-                  extractedText += '\n'
-                }
-              }
-              currentWord = ''
-            }
-            
-            // Add line breaks for better readability
-            if (byte === 10 || byte === 13) {
-              if (currentWord.length > 3) {
-                extractedText += currentWord + ' '
-                wordCount++
-              }
-              extractedText += '\n'
-              currentWord = ''
+              rawText += ' '
             }
           }
           
-          // Add any remaining word
-          if (currentWord.length > 3 && /^[a-zA-Z0-9]/.test(currentWord)) {
-            extractedText += currentWord
+          // Extract meaningful words and phrases
+          const words = rawText
+            .split(/\s+/)
+            .filter(word => {
+              // Filter out XML tags, random characters, and very short words
+              return word.length >= 3 && 
+                     !word.includes('<') && 
+                     !word.includes('>') && 
+                     !word.includes('xml') &&
+                     !word.includes('ppt') &&
+                     !word.includes('customXml') &&
+                     !word.includes('slideLayout') &&
+                     !word.includes('slideMaster') &&
+                     !/^[A-Z]{2,}$/.test(word) && // Skip all-caps abbreviations
+                     !/^[a-z]{1,2}$/.test(word) && // Skip very short lowercase
+                     /[a-zA-Z]/.test(word) && // Must contain letters
+                     !/^[0-9]+$/.test(word) && // Skip pure numbers
+                     word.length < 50 // Skip very long strings (likely corrupted)
+            })
+            .slice(0, 1000) // Limit to first 1000 meaningful words
+          
+          // Look for business-related keywords to prioritize relevant content
+          const businessKeywords = [
+            'business', 'model', 'revenue', 'market', 'customer', 'product', 'service',
+            'growth', 'strategy', 'team', 'funding', 'investment', 'financial', 'profit',
+            'impact', 'social', 'environmental', 'sustainable', 'solution', 'problem',
+            'technology', 'innovation', 'scale', 'operations', 'management', 'risk'
+          ]
+          
+          // Prioritize sentences containing business keywords
+          const sentences = words.join(' ')
+            .split(/[.!?]+/)
+            .filter(sentence => {
+              const lowerSentence = sentence.toLowerCase()
+              return sentence.length > 20 && 
+                     sentence.length < 500 &&
+                     businessKeywords.some(keyword => lowerSentence.includes(keyword))
+            })
+            .slice(0, 50) // Limit to 50 most relevant sentences
+          
+          let extractedText = sentences.join('. ').trim()
+          
+          // If no business-relevant content found, use general word extraction
+          if (extractedText.length < 200 && words.length > 50) {
+            extractedText = words.slice(0, 500).join(' ')
           }
           
-          // Clean up the extracted text
+          // Final cleanup
           extractedText = extractedText
             .replace(/\s+/g, ' ')
-            .replace(/(.)\\1{4,}/g, '$1') // Remove repeated characters
-            .replace(/[^\w\s.,:;!?()$%-]/g, " ") // Remove non-standard characters but keep financial symbols
+            .replace(/(.)\1{3,}/g, '$1') // Remove excessive repeated characters
+            .replace(/[^\w\s.,:;!?()$%-]/g, ' ') // Clean special characters
             .replace(/\s+/g, ' ')
             .trim()
           
-          if (extractedText.length > 500 && wordCount > 50) {
-            console.log(`Fallback extraction successful for ${file.name}: ${extractedText.length} characters, ${wordCount} words`)
+          if (extractedText.length > 200) {
+            console.log(`Fallback extraction successful for ${file.name}: ${extractedText.length} characters`)
             return `=== DOCUMENT: ${file.name} (Fallback Extraction) ===\n${extractedText}\n=== END DOCUMENT ===`
           } else {
-            console.warn(`Fallback extraction yielded insufficient content for ${file.name}`)
+            console.warn(`Fallback extraction yielded insufficient meaningful content for ${file.name}`)
           }
         } catch (fallbackError) {
           console.warn(`Fallback extraction also failed for ${file.name}:`, fallbackError)
