@@ -100,22 +100,83 @@ const extractTextFromFile = async (file: File): Promise<string> => {
           throw new Error('Invalid file object provided')
         }
         
-        // Wait a moment to ensure file is fully loaded
-        await new Promise(resolve => setTimeout(resolve, 200))
+        // Enhanced file validation before Blink API call
+        if (!file.name || file.name.trim() === '') {
+          throw new Error('File must have a valid name')
+        }
         
-        // Validate file can be read as blob
+        if (file.size === 0) {
+          throw new Error('File is empty')
+        }
+        
+        // Validate file can be read as blob with more thorough testing
         try {
-          const testBuffer = await file.slice(0, 100).arrayBuffer()
+          console.log(`Validating file readability for ${file.name}...`)
+          const testBuffer = await file.slice(0, Math.min(1024, file.size)).arrayBuffer()
           if (testBuffer.byteLength === 0) {
             throw new Error('File appears to be empty or corrupted')
+          }
+          
+          // Additional check: ensure file has expected binary signature for its type
+          const uint8Array = new Uint8Array(testBuffer)
+          if (extension === 'pdf' && uint8Array.length >= 4) {
+            const pdfSignature = String.fromCharCode(...uint8Array.slice(0, 4))
+            if (pdfSignature !== '%PDF') {
+              console.warn(`File ${file.name} may not be a valid PDF (missing PDF signature)`)
+            }
           }
         } catch (testError) {
           throw new Error(`File validation failed: ${testError instanceof Error ? testError.message : 'Unknown error'}`)
         }
         
-        // Use Blink's powerful data extraction service for proper document processing
-        console.log(`Calling blink.data.extractFromBlob for ${file.name}...`)
-        const extractedText = await blink.data.extractFromBlob(file)
+        // Wait a moment to ensure file is fully loaded and stable
+        await new Promise(resolve => setTimeout(resolve, 300))
+        
+        // Create a fresh File object to ensure clean state
+        const fileBuffer = await file.arrayBuffer()
+        const cleanFile = new File([fileBuffer], file.name, { 
+          type: file.type || 'application/octet-stream',
+          lastModified: file.lastModified || Date.now()
+        })
+        
+        // Validate the clean file
+        if (cleanFile.size !== file.size) {
+          throw new Error('File corruption detected during processing')
+        }
+        
+        // Use Blink's powerful data extraction service with retry logic
+        console.log(`Calling blink.data.extractFromBlob for ${file.name} (${(file.size / 1024).toFixed(1)}KB)...`)
+        
+        let extractedText: string
+        let retryCount = 0
+        const maxRetries = 2
+        
+        while (retryCount <= maxRetries) {
+          try {
+            extractedText = await blink.data.extractFromBlob(cleanFile)
+            break // Success, exit retry loop
+          } catch (blinkError: any) {
+            retryCount++
+            console.warn(`Blink extraction attempt ${retryCount} failed for ${file.name}:`, blinkError)
+            
+            // Check for specific Blink validation errors
+            if (blinkError?.message?.includes('File is required') || 
+                blinkError?.code === 'VALIDATION_ERROR' ||
+                blinkError?.status === 400) {
+              
+              if (retryCount <= maxRetries) {
+                console.log(`Retrying Blink extraction for ${file.name} (attempt ${retryCount + 1}/${maxRetries + 1})...`)
+                await new Promise(resolve => setTimeout(resolve, 1000 * retryCount)) // Exponential backoff
+                continue
+              } else {
+                throw new Error(`File validation failed after ${maxRetries + 1} attempts. The file may be corrupted, in an unsupported format, or the service may be temporarily unavailable.`)
+              }
+            } else {
+              // For other errors, don't retry
+              throw blinkError
+            }
+          }
+        }
         
         if (extractedText && typeof extractedText === 'string' && extractedText.trim().length > 100) {
           console.log(`Successfully extracted ${extractedText.length} characters from ${file.name}`)

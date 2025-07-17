@@ -129,7 +129,7 @@ export default function EntrepreneurDashboard() {
     solution: ''
   })
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = e.target.files
     if (!selectedFiles || selectedFiles.length === 0) return
     
@@ -146,6 +146,12 @@ export default function EntrepreneurDashboard() {
         continue
       }
       
+      // Check file name validity
+      if (!file.name || file.name.trim() === '') {
+        errors.push(`File ${i + 1} has no name`)
+        continue
+      }
+      
       // Check file size (10MB limit per file)
       const maxFileSize = 10 * 1024 * 1024 // 10MB in bytes
       if (file.size > maxFileSize) {
@@ -158,6 +164,30 @@ export default function EntrepreneurDashboard() {
       const allowedExtensions = ['pdf', 'docx', 'pptx', 'xlsx', 'doc', 'ppt', 'xls', 'txt', 'csv', 'md', 'json', 'html', 'htm']
       if (!extension || !allowedExtensions.includes(extension)) {
         errors.push(`${file.name} has unsupported file type (${extension || 'unknown'})`)
+        continue
+      }
+      
+      // Enhanced file integrity check
+      try {
+        // Test if file can be read as ArrayBuffer
+        const testBuffer = await file.slice(0, Math.min(100, file.size)).arrayBuffer()
+        if (testBuffer.byteLength === 0 && file.size > 0) {
+          errors.push(`${file.name} appears to be corrupted (cannot read file content)`)
+          continue
+        }
+        
+        // Basic file signature validation for common types
+        if (testBuffer.byteLength >= 4) {
+          const uint8Array = new Uint8Array(testBuffer)
+          const signature = String.fromCharCode(...uint8Array.slice(0, 4))
+          
+          if (extension === 'pdf' && !signature.startsWith('%PDF')) {
+            errors.push(`${file.name} may not be a valid PDF file`)
+            continue
+          }
+        }
+      } catch (readError) {
+        errors.push(`${file.name} cannot be read (file may be corrupted)`)
         continue
       }
       
@@ -229,13 +259,31 @@ export default function EntrepreneurDashboard() {
       return
     }
 
-    // Additional validation for files
+    // Enhanced validation for files before AI processing
     const fileArray = Array.from(files)
-    const invalidFiles = fileArray.filter(file => !file || file.size === 0)
+    
+    // Check for empty or corrupted files
+    const invalidFiles = fileArray.filter(file => !file || file.size === 0 || !file.name || file.name.trim() === '')
     if (invalidFiles.length > 0) {
       toast({
         title: "Invalid Files Detected",
-        description: `${invalidFiles.length} file(s) appear to be empty or corrupted. Please re-select your files.`,
+        description: `${invalidFiles.length} file(s) appear to be empty, corrupted, or have invalid names. Please re-select your files.`,
+        variant: "destructive"
+      })
+      return
+    }
+    
+    // Additional file readability test
+    try {
+      for (const file of fileArray) {
+        // Quick readability test
+        const testSlice = file.slice(0, 10)
+        await testSlice.arrayBuffer() // This will throw if file is corrupted
+      }
+    } catch (fileError) {
+      toast({
+        title: "File Corruption Detected",
+        description: "One or more files cannot be read properly. Please re-select your files and try again.",
         variant: "destructive"
       })
       return
@@ -287,29 +335,64 @@ export default function EntrepreneurDashboard() {
       
       console.error('AI Processing Error:', error)
       
-      toast({
-        title: "AI Processing Error",
-        description: errorMessage,
-        variant: "destructive"
-      })
-      
-      // Provide specific suggestions based on error type
-      if (errorMessage.includes('too large') || errorMessage.includes('File too large')) {
+      // Enhanced error handling with more specific messages
+      if (errorMessage.includes('File validation failed after') && errorMessage.includes('attempts')) {
         toast({
-          title: "Suggestion",
-          description: "Try uploading fewer files or smaller documents (under 10MB each).",
+          title: "File Processing Failed",
+          description: "Unable to process your files after multiple attempts. This may be due to file corruption, unsupported format, or temporary service issues.",
+          variant: "destructive"
+        })
+        
+        toast({
+          title: "Suggestions",
+          description: "Try: 1) Re-uploading your files, 2) Converting to a different format (PDF recommended), 3) Using smaller files, or 4) Continue with manual entry.",
+        })
+        
+        // Still allow manual entry
+        setStage('review')
+      } else if (errorMessage.includes('File is required') || errorMessage.includes('VALIDATION_ERROR')) {
+        toast({
+          title: "File Validation Error",
+          description: "There was an issue with file validation. Please re-select your files and ensure they are not corrupted.",
+          variant: "destructive"
+        })
+        
+        toast({
+          title: "Quick Fix",
+          description: "Try re-selecting your files from the file picker and upload again.",
+        })
+      } else if (errorMessage.includes('too large') || errorMessage.includes('File too large')) {
+        toast({
+          title: "File Size Error",
+          description: "One or more files are too large for processing.",
+          variant: "destructive"
+        })
+        
+        toast({
+          title: "Solution",
+          description: "Please use files under 10MB each, or try uploading fewer files at once.",
         })
       } else if (errorMessage.includes('readable text') || errorMessage.includes('Insufficient text')) {
         toast({
-          title: "Suggestion", 
-          description: "Ensure your documents contain text content. PDFs with only images may not work well.",
+          title: "Text Extraction Issue",
+          description: "Unable to extract sufficient text from your documents.",
+          variant: "destructive"
         })
-      } else if (errorMessage.includes('File is required') || errorMessage.includes('empty') || errorMessage.includes('corrupted')) {
+        
         toast({
-          title: "File Issue",
-          description: "One or more files appear to be corrupted or empty. Please re-select your files and try again.",
+          title: "Suggestion", 
+          description: "Ensure your documents contain readable text. Image-only PDFs or scanned documents may not work well. Try using text-based documents.",
         })
+        
+        // Allow manual entry for this case
+        setStage('review')
       } else if (errorMessage.includes('temporarily unavailable') || errorMessage.includes('service')) {
+        toast({
+          title: "Service Temporarily Unavailable",
+          description: "The AI processing service is temporarily unavailable.",
+          variant: "destructive"
+        })
+        
         toast({
           title: "Alternative",
           description: "You can still proceed by filling out the form manually in the next step.",
@@ -318,10 +401,17 @@ export default function EntrepreneurDashboard() {
         // Allow user to proceed with empty data for manual entry
         setStage('review')
       } else {
+        // Generic error handling
+        toast({
+          title: "AI Processing Error",
+          description: errorMessage,
+          variant: "destructive"
+        })
+        
         // For any other error, still allow manual entry
         toast({
           title: "Manual Entry Available",
-          description: "AI processing failed, but you can continue with manual data entry.",
+          description: "AI processing encountered an issue, but you can continue with manual data entry.",
         })
         setStage('review')
       }
