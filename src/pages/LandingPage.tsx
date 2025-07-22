@@ -77,13 +77,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToProjectRoom }) =>
                 opacity: Math.max(0.8, 1 - scrollY * 0.001)
               }}
             >
-              <div className="bg-white/90 backdrop-blur-sm rounded-2xl px-8 py-6 shadow-lg border border-gray-100">
-                <img 
-                  src="/kickimpact-logo.png" 
-                  alt="KickImpact Logo" 
-                  className="h-16 w-auto object-contain"
-                />
-              </div>
+              <img 
+                src="/kickimpact-logo.png" 
+                alt="KickImpact Logo" 
+                className="h-32 w-auto object-contain hover:scale-105 transition-transform duration-300"
+              />
             </div>
           </div>
 

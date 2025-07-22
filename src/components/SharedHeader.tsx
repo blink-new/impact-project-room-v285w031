@@ -19,7 +19,7 @@ const SharedHeader: React.FC<SharedHeaderProps> = ({ onNavigateToHome, title, ch
           <img 
             src="/kickimpact-logo.png" 
             alt="KickImpact Logo" 
-            className="h-8 w-auto object-contain"
+            className="h-12 w-auto object-contain"
           />
           <span className="text-xl font-bold text-[#243D66]">
             Kick<span className="text-[#D97A45]">Impact</span>
