@@ -127,48 +127,115 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToProjectRoom }) =>
             <span className="text-[#D97A45]">Real-Economy Impact</span>
           </h2>
 
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            {/* Pyramid */}
-            <div className="relative">
-              <div className="space-y-4">
-                {/* Level 1 - Capital Structuring */}
-                <div className="bg-gradient-to-r from-[#D97A45] to-[#516f98] p-6 rounded-lg text-center text-white transform hover:scale-105 transition-transform">
-                  <h3 className="text-lg font-bold text-[#243D66]">Capital Structuring</h3>
-                  <p className="text-[#243D66] font-medium">& GP Innovation</p>
+          <div className="flex justify-center items-center">
+            <div className="relative max-w-4xl">
+              {/* Pyramid Structure */}
+              <div className="flex flex-col items-center space-y-6">
+                
+                {/* Level 1 - Top of Pyramid (Smallest) */}
+                <div className="relative">
+                  <div 
+                    className="bg-white border-4 border-[#D97A45] shadow-lg transform hover:scale-105 transition-all duration-300"
+                    style={{
+                      width: '280px',
+                      height: '120px',
+                      clipPath: 'polygon(20% 0%, 80% 0%, 100% 100%, 0% 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    <div className="text-center px-4 py-2">
+                      <h3 className="text-lg font-bold text-[#243D66] leading-tight">Capital</h3>
+                      <h3 className="text-lg font-bold text-[#243D66] leading-tight">Structuring</h3>
+                      <p className="text-sm font-medium text-[#243D66]">& GP Innovation</p>
+                    </div>
+                  </div>
+                  {/* Icon */}
+                  <div className="absolute -right-20 top-1/2 transform -translate-y-1/2">
+                    <div className="w-12 h-12 bg-[#516f98] rounded-full flex items-center justify-center">
+                      <TrendingUp className="w-6 h-6 text-white" />
+                    </div>
+                  </div>
                 </div>
 
-                {/* Level 2 - Tech Infrastructure */}
-                <div className="bg-gradient-to-r from-[#D97A45] to-[#516f98] p-6 rounded-lg text-center text-white transform hover:scale-105 transition-transform mx-4">
-                  <h3 className="text-lg font-bold text-[#243D66]">Tech Infrastructure</h3>
-                  <p className="text-[#243D66] font-medium">& Transparency</p>
+                {/* Level 2 */}
+                <div className="relative">
+                  <div 
+                    className="bg-white border-4 border-[#D97A45] shadow-lg transform hover:scale-105 transition-all duration-300"
+                    style={{
+                      width: '360px',
+                      height: '120px',
+                      clipPath: 'polygon(15% 0%, 85% 0%, 100% 100%, 0% 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    <div className="text-center px-4 py-2">
+                      <h3 className="text-lg font-bold text-[#243D66] leading-tight">Tech Infrastructure</h3>
+                      <p className="text-sm font-medium text-[#243D66]">& Transparency</p>
+                    </div>
+                  </div>
+                  {/* Icon */}
+                  <div className="absolute -right-24 top-1/2 transform -translate-y-1/2">
+                    <div className="w-12 h-12 bg-[#516f98] rounded-full flex items-center justify-center">
+                      <Camera className="w-6 h-6 text-white" />
+                    </div>
+                  </div>
                 </div>
 
-                {/* Level 3 - Industrial Operating */}
-                <div className="bg-gradient-to-r from-[#D97A45] to-[#516f98] p-6 rounded-lg text-center text-white transform hover:scale-105 transition-transform mx-8">
-                  <h3 className="text-lg font-bold text-[#243D66]">Industrial Operating</h3>
-                  <p className="text-[#243D66] font-medium">Models</p>
+                {/* Level 3 */}
+                <div className="relative">
+                  <div 
+                    className="bg-white border-4 border-[#D97A45] shadow-lg transform hover:scale-105 transition-all duration-300"
+                    style={{
+                      width: '440px',
+                      height: '120px',
+                      clipPath: 'polygon(12% 0%, 88% 0%, 100% 100%, 0% 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    <div className="text-center px-4 py-2">
+                      <h3 className="text-lg font-bold text-[#243D66] leading-tight">Industrial Operating</h3>
+                      <p className="text-sm font-medium text-[#243D66]">Models</p>
+                    </div>
+                  </div>
+                  {/* Icon */}
+                  <div className="absolute -right-28 top-1/2 transform -translate-y-1/2">
+                    <div className="w-12 h-12 bg-[#D97A45] rounded-full flex items-center justify-center">
+                      <Cpu className="w-6 h-6 text-white" />
+                    </div>
+                  </div>
                 </div>
 
-                {/* Level 4 - Carbon Assets */}
-                <div className="bg-gradient-to-r from-[#D97A45] to-[#516f98] p-6 rounded-lg text-center text-white transform hover:scale-105 transition-transform mx-12">
-                  <h3 className="text-lg font-bold text-[#243D66]">On-the-Ground Carbon Assets</h3>
+                {/* Level 4 - Base of Pyramid (Largest) */}
+                <div className="relative">
+                  <div 
+                    className="bg-white border-4 border-[#D97A45] shadow-lg transform hover:scale-105 transition-all duration-300"
+                    style={{
+                      width: '520px',
+                      height: '120px',
+                      clipPath: 'polygon(10% 0%, 90% 0%, 100% 100%, 0% 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    <div className="text-center px-4 py-2">
+                      <h3 className="text-lg font-bold text-[#243D66] leading-tight">On-the-Ground Carbon Assets</h3>
+                    </div>
+                  </div>
+                  {/* Icon */}
+                  <div className="absolute -right-32 top-1/2 transform -translate-y-1/2">
+                    <div className="w-12 h-12 bg-[#D97A45] rounded-full flex items-center justify-center">
+                      <Anchor className="w-6 h-6 text-white" />
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
 
-            {/* Icons */}
-            <div className="flex flex-col space-y-8 items-center">
-              <div className="w-16 h-16 bg-[#516f98] rounded-full flex items-center justify-center">
-                <TrendingUp className="w-8 h-8 text-white" />
-              </div>
-              <div className="w-16 h-16 bg-[#516f98] rounded-full flex items-center justify-center">
-                <Camera className="w-8 h-8 text-white" />
-              </div>
-              <div className="w-16 h-16 bg-[#D97A45] rounded-full flex items-center justify-center">
-                <Cpu className="w-8 h-8 text-white" />
-              </div>
-              <div className="w-16 h-16 bg-[#D97A45] rounded-full flex items-center justify-center">
-                <Anchor className="w-8 h-8 text-white" />
               </div>
             </div>
           </div>
